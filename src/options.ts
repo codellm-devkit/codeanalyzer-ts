@@ -1,0 +1,26 @@
+export type OutputFormat = "json" | "msgpack";
+
+/** Normalized analysis options (produced by the CLI layer, consumed by core). */
+export interface AnalysisOptions {
+  /** Project root to analyze (absolute). */
+  input: string;
+  /** Output directory for analysis.json; null ⇒ print compact JSON to stdout. */
+  output: string | null;
+  format: OutputFormat;
+  /** 1 = symbol table only; 2 = + resolver-based call graph (both cheap, level 1). */
+  analysisLevel: 1 | 2;
+  /** Heavy, framework-based level-2 backend (Joern/CodeQL). Stubbed; off by default. */
+  framework: boolean;
+  /** Restrict analysis to these files (project-relative or absolute). null ⇒ whole project. */
+  targetFiles: string[] | null;
+  /** Skip test trees (default true). */
+  skipTests: boolean;
+  /** Force a clean rebuild instead of reusing the cache. */
+  eager: boolean;
+  /** Skip dependency materialization (use a prepared node_modules). */
+  noBuild: boolean;
+  /** Where caches/intermediate state live; null ⇒ <input>/.codeanalyzer. */
+  cacheDir: string | null;
+  /** Verbosity (repeatable -v). */
+  verbosity: number;
+}
