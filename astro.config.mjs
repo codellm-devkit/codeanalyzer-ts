@@ -79,14 +79,16 @@ export default defineConfig({
         },
       ],
       editLink: {
-        baseUrl:
-          "https://github.com/codellm-devkit/codeanalyzer-ts/edit/docs/",
+        baseUrl: "https://github.com/codellm-devkit/codeanalyzer-ts/edit/docs/",
       },
       sidebar: [
         {
           label: "Start here",
           items: [
-            { label: "What is codeanalyzer-typescript?", slug: "what-is-codeanalyzer" },
+            {
+              label: "What is codeanalyzer-typescript?",
+              slug: "what-is-codeanalyzer",
+            },
             { label: "Quickstart", slug: "quickstart" },
             { label: "Installation", slug: "installing" },
           ],
@@ -99,12 +101,10 @@ export default defineConfig({
             {
               label: "Call graph & dispatch",
               slug: "guides/call-graph",
-              badge: { text: "RTA", variant: "tip" },
             },
             {
               label: "Level 2: CodeQL & entrypoints",
               slug: "guides/level-2",
-              badge: { text: "experimental", variant: "caution" },
             },
           ],
         },
