@@ -2,8 +2,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { gzipSync } from "node:zlib";
 import { encode } from "@msgpack/msgpack";
-import type { AnalysisOptions } from "./options";
-import type { TSApplication } from "./schema";
+import type { AnalysisOptions } from "../options";
+import type { TSApplication } from "../schema";
 
 /**
  * The only facade-visible artifact. With no -o, print compact JSON to stdout (the SDK reads

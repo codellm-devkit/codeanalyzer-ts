@@ -1,8 +1,16 @@
-import { Role, User, type UserId } from "./models";
+import { type Named, Role, User, type UserId } from "./models";
 
 /** Pure helper — top-level function. */
 export function makeGuestName(seed: number): string {
   return `guest-${seed}`;
+}
+
+/**
+ * Calls describe() on an interface-typed receiver. Under RTA this expands to every instantiated
+ * concrete implementer of Named (User, Robot, ...).
+ */
+export function announce(thing: Named): string {
+  return thing.describe();
 }
 
 /** Arrow function bound to a const (function_expression-style callable). */

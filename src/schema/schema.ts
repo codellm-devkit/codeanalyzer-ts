@@ -366,9 +366,25 @@ export interface TSEntrypoint {
 // Application (root)
 // ----------------------------------------------------------------------------------------------
 
+// ----------------------------------------------------------------------------------------------
+// External (phantom) symbol — a synthetic stub for a call target OUTSIDE the project (an imported
+// library / Node builtin). Lets the call graph point at external callees (WALA-style phantom
+// nodes) without dropping the edge or dangling: an edge `target` byte-matches either a real
+// `Callable.signature` or a `TSExternalSymbol.signature`.
+// ----------------------------------------------------------------------------------------------
+
+export interface TSExternalSymbol {
+  signature: string; // e.g. "node:fs.readFileSync", "express.Router.get"
+  name: string; // the called member, e.g. "readFileSync"
+  module: string; // the import/require specifier, e.g. "node:fs", "express", "@scope/pkg"
+  kind: string; // "function" | "constructor" | "unknown"
+  is_external: true;
+}
+
 export interface TSApplication {
   symbol_table: Record<string, TSModule>;
   call_graph: TSCallEdge[];
+  external_symbols: Record<string, TSExternalSymbol>;
   entrypoints: Record<string, TSEntrypoint[]>;
 }
 

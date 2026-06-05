@@ -54,3 +54,11 @@ export class User extends Entity<UserId> implements Named {
     return this.loginCount;
   }
 }
+
+/** A second, unrelated implementer of Named — drives RTA subtype expansion. */
+export class Robot implements Named {
+  constructor(public name: string) {}
+  describe(): string {
+    return `robot:${this.name}`;
+  }
+}

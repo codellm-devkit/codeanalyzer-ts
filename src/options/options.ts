@@ -7,10 +7,8 @@ export interface AnalysisOptions {
   /** Output directory for analysis.json; null ⇒ print compact JSON to stdout. */
   output: string | null;
   format: OutputFormat;
-  /** 1 = symbol table only; 2 = + resolver-based call graph (both cheap, level 1). */
+  /** 1 = tsc resolver call graph (default); 2 = + CodeQL enrichment. */
   analysisLevel: 1 | 2;
-  /** Heavy, framework-based level-2 backend (Joern/CodeQL). Stubbed; off by default. */
-  framework: boolean;
   /** Restrict analysis to these files (project-relative or absolute). null ⇒ whole project. */
   targetFiles: string[] | null;
   /** Skip test trees (default true). */
@@ -19,6 +17,8 @@ export interface AnalysisOptions {
   eager: boolean;
   /** Skip dependency materialization (use a prepared node_modules). */
   noBuild: boolean;
+  /** Emit phantom (external) nodes/edges for imported/required library call targets. Default on. */
+  phantoms: boolean;
   /** Where caches/intermediate state live; null ⇒ <input>/.codeanalyzer. */
   cacheDir: string | null;
   /** Verbosity (repeatable -v). */

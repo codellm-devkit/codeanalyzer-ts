@@ -25,8 +25,8 @@ import {
   type TSVariableDeclaration,
   constructorSignatureOf,
   fileKeyOf,
-} from "./schema";
-import { computeSignatureForDecl } from "./signatures";
+} from "../schema";
+import { computeSignatureForDecl } from "../schema";
 
 // ----------------------------------------------------------------------------------------------
 // dynamic-getter helpers
@@ -35,6 +35,17 @@ import { computeSignatureForDecl } from "./signatures";
 function boolOf(node: unknown, name: string): boolean {
   const n = node as Record<string, unknown>;
   return typeof n[name] === "function" ? !!(n[name] as () => unknown).call(n) : false;
+}
+
+/**
+ * True only for a redundant overload *signature* — one that has a sibling implementation we'll
+ * capture instead. Bodiless declarations with NO implementation (abstract methods, ambient
+ * `declare` functions, methods on `declare`d classes) are NOT redundant and must be kept.
+ */
+function isRedundantOverload(node: Node): boolean {
+  const n = node as unknown as { isOverload?: () => boolean; getImplementation?: () => unknown };
+  if (typeof n.isOverload !== "function" || !n.isOverload()) return false;
+  return typeof n.getImplementation === "function" ? n.getImplementation() !== undefined : false;
 }
 
 function clamp(s: string | undefined | null, max = 400): string | null {
@@ -185,7 +196,7 @@ function typeParamsOf(node: Node): TSTypeParameter[] {
 // leaf builders
 // ----------------------------------------------------------------------------------------------
 
-function buildParam(param: Node): import("./schema").TSCallableParameter {
+function buildParam(param: Node): import("../schema").TSCallableParameter {
   const p = param as unknown as {
     getName: () => string;
     getTypeNode?: () => { getText: () => string } | undefined;
@@ -549,7 +560,7 @@ export function buildClass(cls: Node, root: string): { sig: string; cls: TSClass
 
   const methods: Record<string, TSCallable> = {};
   for (const m of c.getMethods()) {
-    if (boolOf(m, "isOverload")) continue;
+    if (isRedundantOverload(m)) continue;
     const r = buildCallable(m, m, "method", root);
     if (r) methods[r.sig] = r.callable;
   }
@@ -559,7 +570,7 @@ export function buildClass(cls: Node, root: string): { sig: string; cls: TSClass
     methods[imp.sig] = imp.callable;
   } else {
     for (const ctor of ctors) {
-      if (boolOf(ctor, "isOverload")) continue;
+      if (isRedundantOverload(ctor)) continue;
       const r = buildCallable(ctor, ctor, "constructor", root);
       if (r) methods[r.sig] = r.callable;
     }
@@ -781,7 +792,7 @@ function buildStatemented(container: Node, root: string, varScope: TSVariableDec
   }
   const functions: Record<string, TSCallable> = {};
   for (const fn of c.getFunctions()) {
-    if (boolOf(fn, "isOverload")) continue;
+    if (isRedundantOverload(fn)) continue;
     const r = buildCallable(fn, fn, "function", root);
     if (r) functions[r.sig] = r.callable;
   }

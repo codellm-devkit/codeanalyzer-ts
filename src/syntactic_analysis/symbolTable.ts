@@ -1,12 +1,12 @@
 import { Project, ts } from "ts-morph";
 import { buildModule } from "./builders";
-import { fileMeta, fileUnchanged } from "./cache";
+import { fileMeta, fileUnchanged } from "../utils";
 import { discoverSourceFiles, resolveTargetFiles, type DiscoveredFile } from "./discovery";
-import type { Materialization } from "./materialize";
-import type { AnalysisOptions } from "./options";
+import type { Materialization } from "../build";
+import type { AnalysisOptions } from "../options";
 import type { Node } from "ts-morph";
-import type { TSModule } from "./schema";
-import type { Logger } from "./util";
+import type { TSModule } from "../schema";
+import type { Logger } from "../utils";
 
 export interface SymbolTableResult {
   project: Project;

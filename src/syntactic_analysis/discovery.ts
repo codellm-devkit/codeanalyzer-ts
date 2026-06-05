@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { relPosix } from "./util";
+import { relPosix } from "../utils";
 
 const SOURCE_EXTS = new Set([".ts", ".tsx", ".mts", ".cts"]);
 

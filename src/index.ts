@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { analyze } from "./core";
 import { parseArgs } from "./cli";
-import { emit } from "./serialize";
+import { emit } from "./utils";
 
 function main(): void {
   try {

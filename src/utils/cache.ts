@@ -1,9 +1,11 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { TSCallEdge, TSModule } from "./schema";
-import { sha256 } from "./util";
+import type { TSCallEdge, TSModule } from "../schema";
+import { sha256 } from "./fs";
+import { ANALYZER_VERSION } from "./version";
 
 export interface CacheData {
+  analyzer_version?: string;
   symbol_table: Record<string, TSModule>;
   call_graph: TSCallEdge[];
 }
@@ -16,7 +18,11 @@ export function loadCache(cacheDir: string): CacheData | null {
   try {
     const p = cacheFilePath(cacheDir);
     if (!fs.existsSync(p)) return null;
-    return JSON.parse(fs.readFileSync(p, "utf-8")) as CacheData;
+    const data = JSON.parse(fs.readFileSync(p, "utf-8")) as CacheData;
+    // Invalidate the whole cache when the analyzer version changed — the per-file source hash
+    // can't detect that the extraction logic itself moved on.
+    if (data.analyzer_version !== ANALYZER_VERSION) return null;
+    return data;
   } catch {
     return null;
   }
@@ -25,7 +31,7 @@ export function loadCache(cacheDir: string): CacheData | null {
 export function saveCache(cacheDir: string, data: CacheData): void {
   try {
     fs.mkdirSync(cacheDir, { recursive: true });
-    fs.writeFileSync(cacheFilePath(cacheDir), JSON.stringify(data));
+    fs.writeFileSync(cacheFilePath(cacheDir), JSON.stringify({ analyzer_version: ANALYZER_VERSION, ...data }));
   } catch {
     /* caching is best-effort */
   }
