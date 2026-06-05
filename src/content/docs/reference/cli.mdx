@@ -1,0 +1,79 @@
+---
+title: CLI options
+description: The complete option reference for the codeanalyzer-typescript command — every flag, its default, and what it controls.
+---
+
+import { Aside, LinkCard, CardGrid } from "@astrojs/starlight/components";
+
+```
+codeanalyzer-typescript [OPTIONS]
+```
+
+CLDK TypeScript analyzer — emits the canonical `analysis.json` (symbol table + resolver call graph) using the TypeScript compiler via ts-morph. The only required option is `--input`. With no `--output`, the artifact is printed to stdout as compact JSON.
+
+## Options
+
+| Option | Alias | Type | Default | Description |
+| --- | --- | --- | --- | --- |
+| `--input` | `-i` | `PATH` | *required* | Project root to analyze. |
+| `--output` | `-o` | `DIR` | *(stdout)* | Output **directory** for `analysis.json`. If omitted, compact JSON is printed to stdout. |
+| `--format` | `-f` | `json` \| `msgpack` | `json` | Output serialization format. |
+| `--analysis-level` | `-a` | `1` \| `2` | `1` | `1` = tsc resolver call graph + RTA; `2` = + CodeQL enrichment (experimental). |
+| `--target-files` | `-t` | `PATHS…` | *(whole project)* | Restrict analysis to specific files (incremental); the rest is served from cache. |
+| `--skip-tests` | | flag | `--skip-tests` | Skip test trees (the default). |
+| `--include-tests` | | flag | | Include test trees in the analysis. |
+| `--eager` | | flag | | Force a clean rebuild — reinstall dependencies, rebuild the analysis. |
+| `--lazy` | | flag | `--lazy` | Reuse the cache (the default). |
+| `--no-build` | | flag | | Skip dependency materialization; reuse a prepared `node_modules`. |
+| `--no-phantoms` | | flag | | Disable phantom (external) nodes for imported/required library calls. |
+| `--cache-dir` | `-c` | `DIR` | `<input>/.codeanalyzer` | Cache/intermediate directory. |
+| `--verbose` | `-v` | count | `0` | Increase verbosity (repeatable): `-v` (info), `-vv` (debug). |
+| `--help` | `-h` | | | Show the help message and exit. |
+
+<Aside type="note" title="Output is a directory">
+`--output` names a directory, not a file. codeanalyzer-typescript writes `analysis.json` (or `analysis.msgpack`) inside it.
+</Aside>
+
+## Notes on defaults
+
+- **Level 1 by default.** The TypeScript checker plus RTA resolve the call graph; pass `--analysis-level 2` for (experimental) CodeQL enrichment.
+- **Lazy by default.** Analysis reuses the cached symbol table and call graph for unchanged files. Use `--eager` to force a full rebuild.
+- **Builds by default.** Dependencies are materialized into `node_modules` so types resolve. Use `--no-build` to reuse a prepared tree.
+- **Phantoms on by default.** Calls into imported libraries become `external_symbols`. Use `--no-phantoms` to restrict the graph to in-project targets.
+- **Tests excluded by default.** Test trees are skipped unless you pass `--include-tests`.
+- **Cache kept by default.** The cache under `.codeanalyzer/` survives between runs; `--eager` rebuilds it.
+
+## Output files
+
+| Format | File | Notes |
+| --- | --- | --- |
+| `json` | `analysis.json` | Compact JSON. Also the stdout format when `--output` is omitted. |
+| `msgpack` | `analysis.msgpack` | MessagePack; more compact for storage and transmission. |
+
+Both encode the same `TSApplication` schema — see [Output schema](/codeanalyzer-ts/reference/schema/).
+
+## Examples
+
+```shell
+# Symbol table + call graph to stdout
+codeanalyzer-typescript --input ./proj
+
+# Write JSON to a directory
+codeanalyzer-typescript --input ./proj --output ./out
+
+# msgpack, eager rebuild
+codeanalyzer-typescript --input ./proj --output ./out --format msgpack --eager
+
+# Incremental: only two files, rest from cache
+codeanalyzer-typescript --input ./proj --target-files src/a.ts src/b.ts
+
+# Reuse a prepared node_modules, custom cache, debug logging
+codeanalyzer-typescript --input ./proj --no-build --cache-dir /tmp/ca -vv
+```
+
+## Where to go next
+
+<CardGrid>
+  <LinkCard title="CLI usage" description="Worked examples and the reasoning behind each flag." href="/codeanalyzer-ts/guides/cli-usage/" />
+  <LinkCard title="Output schema" description="The TSApplication artifact, field by field." href="/codeanalyzer-ts/reference/schema/" />
+</CardGrid>

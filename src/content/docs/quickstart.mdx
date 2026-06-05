@@ -1,0 +1,102 @@
+---
+title: Quickstart
+description: Build codeanalyzer-typescript, run it against a TypeScript project, and read your first analysis.json — symbol table, call graph, and external symbols — in three steps.
+---
+
+import { Steps, Aside, LinkCard, CardGrid, Tabs, TabItem } from "@astrojs/starlight/components";
+
+codeanalyzer-typescript points at a TypeScript or JavaScript project and produces one typed artifact — its symbol table, call graph, and external symbols. Three steps below: build it, run it against a project, and read the result.
+
+<Aside type="note" title="Prerequisite">
+You need **[Bun](https://bun.sh/) 1.0 or higher** to build and run the analyzer. The project you analyze should be a normal Node/TypeScript project — the analyzer resolves types and call targets with the TypeScript compiler. See [Installation](/codeanalyzer-ts/installing/).
+</Aside>
+
+<Steps>
+
+1. **Build the CLI.**
+
+   ```shell
+   git clone https://github.com/codellm-devkit/codeanalyzer-ts
+   cd codeanalyzer-ts
+   bun install
+   bun run build      # -> dist/codeanalyzer-typescript (standalone native binary)
+   ```
+
+   That compiles a standalone binary at `dist/codeanalyzer-typescript` — no Bun or Node needed to run it afterward. To skip the compile step, run from source instead with `bun run start -- …`.
+
+2. **Run it against a project.**
+
+   Point `--input` at any TypeScript/JavaScript project root and `--output` at a directory for the result.
+
+   ```shell
+   ./dist/codeanalyzer-typescript --input ./my-ts-project --output ./out
+   ```
+
+   By default the analyzer first materializes the project's `node_modules` (so imported library calls resolve), walks every source file, builds the symbol table and call graph, and writes `./out/analysis.json`. Intermediate state is cached under `.codeanalyzer/` in the project.
+
+   <Aside type="tip">
+   Omit `--output` to stream the JSON to stdout instead — handy for piping into `jq`:
+
+   ```shell
+   ./dist/codeanalyzer-typescript --input ./my-ts-project | jq '.external_symbols | keys'
+   ```
+   </Aside>
+
+3. **Read the result.**
+
+   `analysis.json` is a single `TSApplication` object with four top-level keys.
+
+   ```shell
+   jq 'keys' ./out/analysis.json
+   # [ "call_graph", "entrypoints", "external_symbols", "symbol_table" ]
+
+   jq '.symbol_table | length' ./out/analysis.json     # modules analyzed
+   jq '.call_graph | length' ./out/analysis.json        # call edges
+   jq '.external_symbols | length' ./out/analysis.json  # phantom library targets
+   ```
+
+   That's it — a directory of source files is now a typed, queryable model of the program.
+
+</Steps>
+
+## Load it into a graph
+
+The call graph is a flat list of `source -> target` edges keyed by callable signature, so it drops straight into any graph library — here, Python's `networkx`:
+
+```python title="reachable.py"
+import json
+import networkx as nx
+
+app = json.load(open("./out/analysis.json"))
+
+g = nx.DiGraph()
+for edge in app["call_graph"]:
+    g.add_edge(edge["source"], edge["target"])
+
+print(g.number_of_nodes(), "nodes,", g.number_of_edges(), "edges")
+# Is a sink reachable from some caller? A graph query, not a guess.
+# print(nx.has_path(g, caller_sig, sink_sig))
+```
+
+Edge endpoints are either a real `TSCallable.signature` from the symbol table or a `TSExternalSymbol.signature` for a call into a library — both are plain strings, so external boundaries show up as nodes in the graph rather than disappearing.
+
+## Go deeper with level 2
+
+The default run is **level 1**: the TypeScript checker resolves the call graph, RTA expands virtual dispatch, and phantom nodes capture external calls — fast, no extra tooling. Level 2 adds CodeQL enrichment for the dynamic cases the checker can't reach.
+
+```shell
+./dist/codeanalyzer-typescript --input ./my-ts-project --output ./out --analysis-level 2
+```
+
+<Aside type="caution">
+Level-2 CodeQL enrichment is **experimental** and currently a no-op stub — it emits a warning and falls back to the level-1 graph. See [Level 2: CodeQL & entrypoints](/codeanalyzer-ts/guides/level-2/) for what it will add and where it stands.
+</Aside>
+
+## Where this goes next
+
+<CardGrid>
+  <LinkCard title="CLI usage" description="Output formats, caching, incremental mode, build control — every flag with examples." href="/codeanalyzer-ts/guides/cli-usage/" />
+  <LinkCard title="Core concepts" description="What the symbol table, call graph, and external symbols actually contain." href="/codeanalyzer-ts/guides/concepts/" />
+  <LinkCard title="Call graph & dispatch" description="How the checker resolves edges and what RTA expands." href="/codeanalyzer-ts/guides/call-graph/" />
+  <LinkCard title="Output schema" description="The TSApplication data model, field by field." href="/codeanalyzer-ts/reference/schema/" />
+</CardGrid>

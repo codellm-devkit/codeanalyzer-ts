@@ -1,7 +1,21 @@
-node_modules/
-dist/
-*.tsbuildinfo
-.codeanalyzer/
-bun.lock
-bun.lockb
+# macOS
 .DS_Store
+
+# environment files
+.env
+.env.production
+
+# Astro build output & generated types
+dist/
+.astro/
+
+# dependencies
+node_modules/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# cache
+.cache/

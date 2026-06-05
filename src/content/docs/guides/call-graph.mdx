@@ -1,0 +1,116 @@
+---
+title: Call graph & dispatch
+description: How codeanalyzer-typescript builds the level-1 call graph — the TypeScript checker resolves each call site, Rapid Type Analysis expands virtual dispatch, and phantom nodes keep edges into imported libraries.
+---
+
+import { Aside, LinkCard, CardGrid } from "@astrojs/starlight/components";
+
+The call graph is the answer to *"who calls whom?"* — a flat list of identity-only `TSCallEdge` objects whose `source` and `target` are signature strings. This page is the deep dive on how the **level-1** graph is built: the TypeScript checker resolves each recorded call site, Rapid Type Analysis expands virtual dispatch, and phantom nodes capture the calls that leave the project. It's the always-on base graph; [level 2](/codeanalyzer-ts/guides/level-2/) enriches it.
+
+```mermaid
+flowchart TB
+    ST[symbol table] --> CS["recorded call sites
+(TSCallsite per callable)"]
+    CS --> R["tsc resolver
+checker maps site → declaration"]
+    R --> BF[backfill callee_signature]
+    R --> DT["declared-type edge
+provenance: tsc"]
+    DT --> RTA["RTA expansion
++ instantiated subtype overrides"]
+    R --> PH["unresolved in-project?
+try phantom"]
+    PH --> EXT["external symbol edge
+provenance: import"]
+    DT --> CG[call_graph]
+    RTA --> CG
+    EXT --> CG
+```
+
+## The tsc resolver
+
+The same TypeScript type checker that typed the symbol table resolves the graph. For each `TSCallsite` recorded inside a callable, the checker maps the call expression to a callee declaration; the analyzer canonicalizes that declaration to a signature, backfills the call site's `callee_signature` in place, and emits an edge.
+
+Because both endpoints come from the same `signatureOf` canonicalizer used to build the symbol table, **edges can only target real signatures** — there are no dangling edges. Checker-resolved edges carry `provenance: ["tsc"]`. A repeated call from the same source to the same target increments the edge's `weight` rather than duplicating it.
+
+<Aside type="note" title="One checker, two jobs">
+There's no separate call-graph pass over raw text. The compiler instance that resolved types for the symbol table is the same one that resolves call targets, so the graph reflects exactly what the project's types say — given the dependencies materialized under `node_modules`.
+</Aside>
+
+## RTA — Rapid Type Analysis
+
+A call through an interface or a base type is a problem for naive resolution: the checker returns the *declared* target (say `Repository.save`), but at runtime the call dispatches to whichever concrete override the receiver actually has. codeanalyzer-typescript handles this with **Rapid Type Analysis**.
+
+For a method call whose declared target lives on an interface or base type, the analyzer also emits edges to every **instantiated** concrete subtype's override of that method. "Instantiated" is the key restriction RTA adds over plain class-hierarchy analysis: a subtype's override is only added if that subtype is actually `new`'d somewhere in the program. Types that are declared but never constructed don't pollute the graph.
+
+```mermaid
+flowchart LR
+    A["src/svc.process"] -->|tsc| D["src/repo.Repository.save
+(declared target)"]
+    A -->|"tsc, rta"| S1["src/repo.SqlRepository.save"]
+    A -->|"tsc, rta"| S2["src/repo.CacheRepository.save"]
+```
+
+RTA-expanded edges are tagged so you can tell them apart from the exact declared-type edge:
+
+```json
+{
+  "source": "src/svc.process",
+  "target": "src/repo.SqlRepository.save",
+  "type": "CALL_DEP",
+  "weight": 1,
+  "provenance": ["tsc"],
+  "tags": { "ts.dispatch": "rta" }
+}
+```
+
+A consumer that wants only exact resolution can filter out edges where `tags["ts.dispatch"] == "rta"`; one reasoning about runtime reachability keeps them.
+
+## Phantom nodes
+
+Not every call stays inside the project. A handler calls `express`'s `Router.get`; a utility calls `node:fs`'s `readFileSync`. Those targets aren't in the symbol table — but dropping the edge would hide real call structure. Instead, codeanalyzer-typescript attributes the call to an imported library member and emits a **phantom node**.
+
+When the tsc resolver can't map a call site to an in-project callable, the analyzer reads the file's imports and `require`s, matches the call's binding to a module specifier, and synthesizes a `TSExternalSymbol`:
+
+```json
+{
+  "signature": "node:fs.readFileSync",
+  "name": "readFileSync",
+  "module": "node:fs",
+  "kind": "function",
+  "is_external": true
+}
+```
+
+The edge into it carries `provenance: ["import"]`, and the phantom is recorded in `external_symbols` under its signature — so an edge `target` byte-matches either a real `TSCallable.signature` or a `TSExternalSymbol.signature`, never nothing.
+
+<Aside type="note" title="Only bare specifiers">
+A specifier is external only if it isn't a relative or absolute path. Packages (`express`), scoped packages (`@scope/pkg`), and `node:` URLs become phantoms; relative imports (`./x`, `../lib/y`) are internal and left to the checker, never faked. Phantom resolution reads only imports — no type checker, no `node_modules` — so it works identically for TypeScript `import` and JavaScript `require`.
+</Aside>
+
+Disable phantom resolution entirely with [`--no-phantoms`](/codeanalyzer-ts/guides/cli-usage/#phantom-nodes) if you want a graph restricted to in-project targets.
+
+## Why identity-only edges
+
+The graph stores only `source`/`target`/`weight`/`provenance`/`tags` — no embedded node objects. The nodes already exist: they're the `TSCallable` entries in the symbol table and the `TSExternalSymbol` entries in `external_symbols`. Keeping edges identity-only means the graph is a plain list of string pairs that loads into any graph library directly, and the rich per-call detail (receiver expression, argument types, location, `is_optional_chain`) lives where it belongs — on the `TSCallsite` inside the calling callable.
+
+```python
+import json, networkx as nx
+
+app = json.load(open("analysis.json"))
+g = nx.DiGraph()
+for e in app["call_graph"]:
+    g.add_edge(e["source"], e["target"], **{"rta": e["tags"].get("ts.dispatch") == "rta"})
+
+# Exact-only view: drop RTA-expanded edges
+exact = [(u, v) for u, v, d in g.edges(data=True) if not d["rta"]]
+```
+
+## Where to go next
+
+<CardGrid>
+  <LinkCard title="Core concepts" description="How the call graph sits alongside the symbol table and external symbols." href="/codeanalyzer-ts/guides/concepts/" />
+  <LinkCard title="Output schema" description="The TSCallEdge and TSExternalSymbol models in full." href="/codeanalyzer-ts/reference/schema/#tscalledge" />
+  <LinkCard title="Level 2: CodeQL & entrypoints" description="What enrichment will add on top of this graph." href="/codeanalyzer-ts/guides/level-2/" />
+  <LinkCard title="CLI usage" description="Flags that change the graph: analysis level, phantoms." href="/codeanalyzer-ts/guides/cli-usage/" />
+</CardGrid>

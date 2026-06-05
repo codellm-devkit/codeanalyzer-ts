@@ -1,0 +1,151 @@
+---
+title: CLI usage
+description: Worked examples for the codeanalyzer-typescript command — output formats, analysis levels, caching, incremental mode, build control, phantom nodes, and verbosity.
+---
+
+import { Aside, LinkCard, CardGrid, Tabs, TabItem } from "@astrojs/starlight/components";
+
+The `codeanalyzer-typescript` command runs static analysis on a TypeScript/JavaScript project and emits a `TSApplication` artifact. This guide walks through the common invocations; for the full flag table see the [CLI reference](/codeanalyzer-ts/reference/cli/).
+
+<Aside type="note" title="Invoking the analyzer">
+The examples below call the compiled binary `codeanalyzer-typescript`. If you haven't built it, run from source instead — `bun run start -- --input …` — everything after `--` is identical.
+</Aside>
+
+## Basic analysis
+
+The only required flag is `--input` (`-i`), the project root:
+
+```shell
+codeanalyzer-typescript --input ./my-ts-project
+```
+
+With no `--output`, the analysis is printed to stdout as compact JSON. Add `--output` (`-o`) to write it to a file instead:
+
+```shell
+codeanalyzer-typescript --input ./my-ts-project --output ./out
+# -> ./out/analysis.json
+```
+
+<Aside type="note">
+`--output` takes a **directory**. The file is named `analysis.json` (or `analysis.msgpack`) inside it; the directory is created if it doesn't exist.
+</Aside>
+
+## Output formats
+
+The default format is JSON. Pass `--format msgpack` (`-f`) for a MessagePack artifact — more compact for storage and faster to load for large projects:
+
+```shell
+codeanalyzer-typescript --input ./my-ts-project --output ./out --format msgpack
+# -> ./out/analysis.msgpack
+```
+
+The schema is identical across formats; only the serialization differs.
+
+## Analysis levels
+
+`--analysis-level` (`-a`) selects how deep the call-graph resolution goes:
+
+```shell
+# Level 1 (default) — tsc resolver call graph + RTA + phantom external nodes
+codeanalyzer-typescript --input ./my-ts-project --analysis-level 1
+
+# Level 2 — additionally enrich with CodeQL
+codeanalyzer-typescript --input ./my-ts-project --analysis-level 2
+```
+
+Every run produces a symbol table **and** a call graph. At level 1, edges come from the TypeScript checker plus Rapid Type Analysis, with phantom nodes for calls into imported libraries. Level 2 is intended to merge in CodeQL-derived edges.
+
+<Aside type="caution">
+Level-2 CodeQL enrichment is **experimental** and currently a stub: it logs a warning and emits no extra edges, falling back to the level-1 graph. See [Level 2: CodeQL & entrypoints](/codeanalyzer-ts/guides/level-2/).
+</Aside>
+
+## Build control: materializing dependencies
+
+By default the analyzer materializes the project's `node_modules` before parsing, so the checker can resolve imported types and library call targets. Two flags control this:
+
+```shell
+# Reuse an already-prepared node_modules; skip materialization
+codeanalyzer-typescript --input ./my-ts-project --no-build
+
+# Force a clean rebuild (reinstall dependencies, rebuild the analysis)
+codeanalyzer-typescript --input ./my-ts-project --eager
+```
+
+Materialization runs the project's package manager with `--ignore-scripts` and **degrades gracefully**: if the install fails, the run still completes with partial type information. See [Installation](/codeanalyzer-ts/installing/#why-your-project-needs-its-dependencies).
+
+## Caching: eager vs lazy
+
+Analysis is **lazy** by default: codeanalyzer-typescript caches the symbol table and call graph under `.codeanalyzer/` and reuses entries for files that haven't changed (detected by content hash, mtime, and size). Pass `--eager` to rebuild everything from scratch; `--lazy` is the explicit default.
+
+```shell
+# Lazy (default) — reuse unchanged files from cache
+codeanalyzer-typescript --input ./my-ts-project
+
+# Eager — rebuild the analysis and reinstall dependencies
+codeanalyzer-typescript --input ./my-ts-project --eager
+```
+
+Control where the cache lives with `--cache-dir` (`-c`). If unset, it defaults to `.codeanalyzer` inside the input project:
+
+```shell
+codeanalyzer-typescript --input ./my-ts-project --cache-dir /tmp/ca-cache
+```
+
+## Incremental mode
+
+To re-analyze only specific files rather than the whole project, pass `--target-files` (`-t`) — the rest of the project is served from cache:
+
+```shell
+codeanalyzer-typescript --input ./my-ts-project --target-files src/a.ts src/b.ts
+```
+
+This restricts the work to the named files, reusing the cached analysis for everything else.
+
+## Including test files
+
+Test trees are skipped by default. Include them with `--include-tests` (or state the default explicitly with `--skip-tests`):
+
+```shell
+codeanalyzer-typescript --input ./my-ts-project --include-tests
+```
+
+## Phantom nodes
+
+By default, calls into imported libraries become phantom `external_symbols` so the graph keeps cross-boundary edges. Disable that with `--no-phantoms` if you want a graph restricted to in-project targets only:
+
+```shell
+codeanalyzer-typescript --input ./my-ts-project --no-phantoms
+```
+
+See [Call graph & dispatch](/codeanalyzer-ts/guides/call-graph/#phantom-nodes) for what phantom nodes capture.
+
+## Verbosity
+
+The tool is quiet by default. Stack `-v` for progressively more logging:
+
+```shell
+codeanalyzer-typescript --input ./my-ts-project -v     # info
+codeanalyzer-typescript --input ./my-ts-project -vv    # debug
+```
+
+## Putting it together
+
+A typical CI invocation — eager rebuild, msgpack out, verbose:
+
+```shell
+codeanalyzer-typescript \
+  --input ./my-ts-project \
+  --output ./artifacts \
+  --format msgpack \
+  --eager \
+  -v
+```
+
+## Where to go next
+
+<CardGrid>
+  <LinkCard title="CLI reference" description="The complete flag table with defaults." href="/codeanalyzer-ts/reference/cli/" />
+  <LinkCard title="Core concepts" description="What the artifact actually contains." href="/codeanalyzer-ts/guides/concepts/" />
+  <LinkCard title="Call graph & dispatch" description="How --analysis-level and --no-phantoms change the graph." href="/codeanalyzer-ts/guides/call-graph/" />
+  <LinkCard title="Output schema" description="The TSApplication data model." href="/codeanalyzer-ts/reference/schema/" />
+</CardGrid>

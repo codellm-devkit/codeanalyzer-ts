@@ -1,0 +1,90 @@
+---
+title: Installation
+description: Build codeanalyzer-typescript from source with Bun, and set up what it needs to materialize a project's dependencies for accurate type resolution.
+---
+
+import { Tabs, TabItem, Aside } from "@astrojs/starlight/components";
+
+`codeanalyzer-typescript` is distributed as source on the [GitHub repository](https://github.com/codellm-devkit/codeanalyzer-ts). You build it once with [Bun](https://bun.sh/) into a standalone native binary, then run that binary anywhere.
+
+## Prerequisites
+
+- **[Bun](https://bun.sh/) 1.0 or higher** — used to install dependencies, run, and compile the analyzer.
+
+### Install Bun
+
+<Tabs>
+  <TabItem label="macOS / Linux">
+    ```shell
+    curl -fsSL https://bun.sh/install | bash
+    ```
+  </TabItem>
+  <TabItem label="Homebrew">
+    ```shell
+    brew install oven-sh/bun/bun
+    ```
+  </TabItem>
+  <TabItem label="npm">
+    ```shell
+    npm install -g bun
+    ```
+  </TabItem>
+</Tabs>
+
+## Build the analyzer
+
+Clone the repository, install dependencies, and compile the binary:
+
+```shell
+git clone https://github.com/codellm-devkit/codeanalyzer-ts
+cd codeanalyzer-ts
+bun install
+bun run build      # -> dist/codeanalyzer-typescript
+```
+
+`bun run build` produces a **standalone native binary** at `dist/codeanalyzer-typescript` — it bundles the runtime, so neither Bun nor Node is needed to run it afterward. Verify it:
+
+```shell
+./dist/codeanalyzer-typescript --help
+```
+
+<Aside type="tip" title="Run without compiling">
+You don't have to build a binary to use the analyzer. Run it straight from source with Bun:
+
+```shell
+bun run start -- --input /path/to/typescript/project
+```
+
+The `--` separates Bun's arguments from the analyzer's.
+</Aside>
+
+## Why your project needs its dependencies
+
+To resolve types and call targets the way the project actually compiles, codeanalyzer-typescript drives the TypeScript compiler against the project's own `node_modules`. By default it **materializes** those dependencies before parsing — running the project's package manager with `--ignore-scripts` so packages' `.d.ts`/JS files are present without compiling native addons.
+
+This means the project you analyze should be a normal Node/TypeScript project (a `package.json`, ideally a `tsconfig.json`). A few notes:
+
+- **`node_modules` is installed in place.** Node's module resolution requires it to live in the project tree, so the analyzer installs there and reuses it on later runs.
+- **Already have `node_modules`?** Pass `--no-build` to skip materialization and reuse the prepared tree.
+- **`--eager` reinstalls** dependencies from scratch, mirroring a clean rebuild.
+- **It degrades, never crashes.** If the install fails (offline, a broken dependency), the analyzer logs a warning and continues with partial type information rather than aborting.
+
+<Aside type="note" title="No tsconfig?">
+If the project has no `tsconfig.json` or `jsconfig.json`, the analyzer falls back to default compiler options. Types still resolve where they can; some may come back unresolved.
+</Aside>
+
+## Optional: CodeQL (level 2)
+
+Level-2 analysis (`--analysis-level 2`) is designed to enrich the call graph with CodeQL. You do **not** need to install anything for it today — it is an [experimental, not-yet-implemented stub](/codeanalyzer-ts/guides/level-2/) that currently falls back to the level-1 graph.
+
+## Development
+
+The project uses Bun as its toolchain.
+
+```shell
+git clone https://github.com/codellm-devkit/codeanalyzer-ts
+cd codeanalyzer-ts
+bun install
+bun run start -- --input /path/to/typescript/project   # run from source
+bun run typecheck                                       # tsc --noEmit
+```
