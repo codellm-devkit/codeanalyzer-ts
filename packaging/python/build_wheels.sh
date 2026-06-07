@@ -9,7 +9,8 @@
 #
 # Requirements on the build host:
 #   - bun            (https://bun.sh)  -- cross-compiles all targets from one host
-#   - python -m pip install build wheel twine
+#   - python -m pip install build wheel hatchling twine
+#     (hatchling is the build backend; --no-isolation means it must be installed)
 #
 # Usage:
 #   ./build_wheels.sh           # build all targets into ./dist

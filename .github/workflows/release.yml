@@ -80,7 +80,9 @@ jobs:
           python-version: "3.11"
 
       - name: Install Python build tooling
-        run: python -m pip install --upgrade build wheel
+        # hatchling is the build backend; build_wheels.sh runs `python -m build
+        # --no-isolation`, so it must be present in this env (no auto-install).
+        run: python -m pip install --upgrade build wheel hatchling
 
       - name: Build platform wheels (cross-compiles every target via Bun)
         working-directory: packaging/python

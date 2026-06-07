@@ -19,7 +19,7 @@ sdist: the binary cannot be built without Bun.
 ## Building & publishing
 
 ```bash
-python -m pip install build wheel twine
+python -m pip install build wheel hatchling twine
 ./build_wheels.sh            # cross-compiles every target via Bun, emits ./dist/*.whl
 twine upload dist/*.whl
 ```
