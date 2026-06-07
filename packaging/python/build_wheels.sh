@@ -19,9 +19,33 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"          # codeanalyzer-ts repo root (has src/index.ts)
-PKG_VERSION="0.1.0"
+# Version comes from the environment (the release workflow sets it from the git
+# tag); the literal is only a local-dev fallback. It is written into __init__.py,
+# which is hatch's single source of truth for the wheel version.
+PKG_VERSION="${PKG_VERSION:-0.1.0}"
 WHEEL_STEM="codeanalyzer_typescript-${PKG_VERSION}-py3-none-any.whl"
 BIN_DIR="$HERE/src/codeanalyzer_typescript/_bin"
+INIT_PY="$HERE/src/codeanalyzer_typescript/__init__.py"
+
+# Remove built binaries from _bin/ but keep the tracked .gitignore (and the dir),
+# so a local build leaves the working tree pristine.
+clean_bin() { mkdir -p "$BIN_DIR"; find "$BIN_DIR" -mindepth 1 ! -name '.gitignore' -delete; }
+
+# Stamp $PKG_VERSION into __init__.py for the build, restoring the original on
+# exit so the working tree stays pristine (mirrors the _bin cleanup below).
+ORIG_INIT="$(cat "$INIT_PY")"   # $(...) strips the trailing newline; restore re-adds it
+restore_init() { printf '%s\n' "$ORIG_INIT" > "$INIT_PY"; }
+trap restore_init EXIT
+python - "$INIT_PY" "$PKG_VERSION" <<'PY'
+import re, sys
+path, version = sys.argv[1], sys.argv[2]
+text = open(path).read()
+new, n = re.subn(r'__version__ = "[^"]*"', f'__version__ = "{version}"', text)
+if n != 1:
+    raise SystemExit(f"expected exactly one __version__ assignment in {path}, found {n}")
+open(path, "w").write(new)
+print(f">>> stamped __version__ = {version}")
+PY
 
 # "bun --target" : "wheel platform tag"
 TARGETS=(
@@ -46,8 +70,7 @@ for entry in "${TARGETS[@]}"; do
 
   echo ">>> [$target] compiling -> wheel ($plat)"
 
-  rm -rf "$BIN_DIR"
-  mkdir -p "$BIN_DIR"
+  clean_bin
 
   ( cd "$REPO_ROOT" && bun build ./src/index.ts --compile --target="$target" \
       --outfile "$BIN_DIR/codeanalyzer-typescript$ext" )
@@ -58,8 +81,7 @@ for entry in "${TARGETS[@]}"; do
 done
 
 # Clean the working binary so the tree stays pristine.
-rm -rf "$BIN_DIR"
-mkdir -p "$BIN_DIR"
+clean_bin
 
 echo
 echo ">>> Built wheels:"

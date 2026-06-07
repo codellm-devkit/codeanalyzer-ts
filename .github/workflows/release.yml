@@ -25,6 +25,26 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
+      # Derive the release version from the tag (vX.Y.Z -> X.Y.Z) and require it
+      # to match package.json. This keeps the PyPI wheel version, the GitHub
+      # Release tag, and the npm version in lockstep -- a mismatch fails fast
+      # rather than silently publishing the wrong version to PyPI.
+      - name: Determine and verify version
+        id: ver
+        run: |
+          pkgjson="$(node -p "require('./package.json').version")"
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            version="${GITHUB_REF#refs/tags/v}"
+            if [[ "$version" != "$pkgjson" ]]; then
+              echo "::error::Tag version ($version) != package.json version ($pkgjson). Bump package.json or fix the tag."
+              exit 1
+            fi
+          else
+            version="$pkgjson"   # workflow_dispatch: no tag, fall back to package.json
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo ">>> Releasing version $version"
+
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -64,6 +84,8 @@ jobs:
 
       - name: Build platform wheels (cross-compiles every target via Bun)
         working-directory: packaging/python
+        env:
+          PKG_VERSION: ${{ steps.ver.outputs.version }}
         run: ./build_wheels.sh
 
       - name: Extract raw binaries from wheels (for GitHub Release)

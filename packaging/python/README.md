@@ -31,12 +31,26 @@ matrix.
 
 ## Versioning
 
-Keep the version in lockstep across three places:
+The released version comes from the **git tag**. A push of `vX.Y.Z` triggers the
+release workflow, which derives `X.Y.Z` from the tag, verifies it matches this
+repo's `package.json` `version` (failing fast on mismatch), and stamps it into
+`__init__.py` via `$PKG_VERSION` — hatch reads `__version__` as the wheel version
+(`pyproject.toml` declares `dynamic = ["version"]`). So the GitHub Release tag, the
+PyPI wheel version, and the npm `package.json` version are always in lockstep.
 
-- this repo's `package.json` (`version`)
-- `packaging/python/pyproject.toml` (`project.version`) and `__init__.py` (`__version__`)
-- the python-sdk pin in `pyproject.toml`: `[tool.backend-versions] codeanalyzer-typescript`
-  and the `dependencies` entry `codeanalyzer-typescript==<version>`
+To cut a release: bump `package.json` `version`, then push the matching tag, e.g.
+
+```bash
+npm version 0.2.0 --no-git-tag-version   # or edit package.json
+git commit -am "Release v0.2.0" && git tag v0.2.0 && git push --tags
+```
+
+For a **local** wheel build, override the fallback version explicitly:
+`PKG_VERSION=0.2.0 ./build_wheels.sh`.
+
+One thing still tracked by hand: the python-sdk pin — `[tool.backend-versions]
+codeanalyzer-typescript` and the `dependencies` entry
+`codeanalyzer-typescript==<version>` — must be bumped to consume a new release.
 
 ## SDK integration
 
