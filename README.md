@@ -9,23 +9,39 @@ It is the TypeScript backend behind [CLDK](https://github.com/codellm-devkit/pyt
 mirroring its [Python](https://github.com/codellm-devkit/codeanalyzer-python) and
 [Java](https://github.com/codellm-devkit/codeanalyzer-java) siblings.
 
-## Prerequisites
-
-- [Bun](https://bun.sh/) 1.0 or higher (used to run and compile the analyzer)
-
 The analyzer resolves types and call targets with the TypeScript compiler, so the project
 being analyzed should be a normal Node/TypeScript project. By default, the analyzer
 materializes the project's dependencies (`node_modules`) so that imported library calls can
 be resolved as phantom (external) nodes; pass `--no-build` to reuse an already-prepared
 `node_modules`.
 
-### Install Bun
+## Install
+
+The quickest way to get the `cants` command is from PyPI — the wheel bundles a prebuilt,
+self-contained binary for your platform (no Bun or Node required to run it):
+
+```bash
+pip install codeanalyzer-typescript
+cants --help
+```
+
+This is also the package CLDK's Python SDK depends on to locate the analyzer backend.
+
+Alternatively, install it with [Homebrew](https://brew.sh/):
+
+```bash
+brew install codellm-devkit/homebrew-tap/codeanalyzer-typescript
+```
+
+To build from source instead, see [Building `cants`](#building-cants) below.
+
+## Building `cants`
+
+Building from source requires [Bun](https://bun.sh/) 1.0 or higher:
 
 ```bash
 curl -fsSL https://bun.sh/install | bash
 ```
-
-## Building `cants`
 
 Clone the repository and install dependencies:
 

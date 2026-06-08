@@ -9,6 +9,16 @@ It is the TypeScript backend behind [CLDK](https://github.com/codellm-devkit/pyt
 mirroring its [Python](https://github.com/codellm-devkit/codeanalyzer-python) and
 [Java](https://github.com/codellm-devkit/codeanalyzer-java) siblings.
 
+## Install
+
+```bash
+pip install codeanalyzer-typescript
+```
+
+The wheel bundles a prebuilt, self-contained `cants` binary for your platform (no Bun or
+Node required to run it) and installs a `cants` command on your `PATH`. CLDK's Python SDK
+depends on this package to locate the analyzer backend.
+
 ## Usage
 
 The analyzer provides a command-line interface for performing static analysis on
